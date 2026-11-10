@@ -34,14 +34,20 @@ const supabase =
 const extrairIdGoogleDrive = (urlOuId) => {
   if (!urlOuId) return ""
   const limpo = urlOuId.trim()
-  // Se for apenas o ID (sem barras ou pontos)
   if (!limpo.includes("/") && !limpo.includes(".")) {
     return limpo
   }
-  // Regex para capturar IDs em links do Drive (/d/ ou id=)
-  const regex = /(?:\/d\/|id=)([a-zA-Z0-9_-]+)/
+  const regex = /(?:\/d\/|id=|\/open\?id=)([a-zA-Z0-9_-]+)/
   const match = limpo.match(regex)
-  return match && match[1] ? match[1] : limpo
+  if (match && match[1]) {
+    return match[1]
+  }
+  const partes = limpo.split("/")
+  const indexD = partes.indexOf("d")
+  if (indexD !== -1 && partes[indexD + 1]) {
+    return partes[indexD + 1]
+  }
+  return limpo
 }
 
 // Formata para URL direta de imagem do Google Drive se houver ID
@@ -51,7 +57,7 @@ const formatarUrlFoto = (urlOuId) => {
   if (id.length > 20 && !id.startsWith("http")) {
     return `https://drive.google.com/uc?id=${id}`
   }
-  return urlOuId // Se for um link externo normal (ex: Imgur, etc)
+  return urlOuId
 }
 
 export default function App() {
@@ -328,6 +334,7 @@ export default function App() {
     const clienteParaSalvar = {
       ...newCliente,
       foto_url: formatarUrlFoto(newCliente.foto_url),
+      user_id: session.user.id,
     }
 
     if (supabase) {
@@ -390,6 +397,7 @@ export default function App() {
     const credorParaSalvar = {
       ...newCredor,
       foto_url: formatarUrlFoto(newCredor.foto_url),
+      user_id: session.user.id,
     }
 
     if (supabase) {
@@ -464,6 +472,7 @@ export default function App() {
         vencimento: dataVencStr,
         status: "pendente",
         motivo_atraso: newItem.motivo_atraso,
+        user_id: session.user.id,
       })
       dataBase.setMonth(dataBase.getMonth() + 1)
     }
@@ -522,6 +531,7 @@ export default function App() {
         vencimento: dataVencStr,
         status: "pendente",
         anotacoes: newPagamento.anotacoes,
+        user_id: session.user.id,
       })
       dataBase.setMonth(dataBase.getMonth() + 1)
     }
