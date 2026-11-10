@@ -10,7 +10,6 @@ import {
   X,
   RefreshCw,
   Bell,
-  Filter,
   CreditCard,
   Wallet,
   MessageCircle,
@@ -30,6 +29,30 @@ const supabase =
   supabaseUrl && supabaseAnonKey
     ? createClient(supabaseUrl, supabaseAnonKey)
     : null
+
+// Função auxiliar para extrair apenas o ID de links do Google Drive
+const extrairIdGoogleDrive = (urlOuId) => {
+  if (!urlOuId) return ""
+  const limpo = urlOuId.trim()
+  // Se for apenas o ID (sem barras ou pontos)
+  if (!limpo.includes("/") && !limpo.includes(".")) {
+    return limpo
+  }
+  // Regex para capturar IDs em links do Drive (/d/ ou id=)
+  const regex = /(?:\/d\/|id=)([a-zA-Z0-9_-]+)/
+  const match = limpo.match(regex)
+  return match && match[1] ? match[1] : limpo
+}
+
+// Formata para URL direta de imagem do Google Drive se houver ID
+const formatarUrlFoto = (urlOuId) => {
+  if (!urlOuId) return ""
+  const id = extrairIdGoogleDrive(urlOuId)
+  if (id.length > 20 && !id.startsWith("http")) {
+    return `https://drive.google.com/uc?id=${id}`
+  }
+  return urlOuId // Se for um link externo normal (ex: Imgur, etc)
+}
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -302,10 +325,15 @@ export default function App() {
 
   const handleAddCliente = async (e) => {
     e.preventDefault()
+    const clienteParaSalvar = {
+      ...newCliente,
+      foto_url: formatarUrlFoto(newCliente.foto_url),
+    }
+
     if (supabase) {
       const { data, error } = await supabase
         .from("clientes_cadastrados")
-        .insert([newCliente])
+        .insert([clienteParaSalvar])
         .select()
       if (error) {
         alert("Erro: " + error.message)
@@ -342,23 +370,32 @@ export default function App() {
   }
 
   const saveEditCliente = async (id) => {
+    const dadosAtualizados = {
+      ...editClienteData,
+      foto_url: formatarUrlFoto(editClienteData.foto_url),
+    }
     if (supabase)
       await supabase
         .from("clientes_cadastrados")
-        .update(editClienteData)
+        .update(dadosAtualizados)
         .eq("id", id)
     setClientes(
-      clientes.map((c) => (c.id === id ? { ...c, ...editClienteData } : c)),
+      clientes.map((c) => (c.id === id ? { ...c, ...dadosAtualizados } : c)),
     )
     setEditingClienteId(null)
   }
 
   const handleAddCredor = async (e) => {
     e.preventDefault()
+    const credorParaSalvar = {
+      ...newCredor,
+      foto_url: formatarUrlFoto(newCredor.foto_url),
+    }
+
     if (supabase) {
       const { data, error } = await supabase
         .from("credores_cadastrados")
-        .insert([newCredor])
+        .insert([credorParaSalvar])
         .select()
       if (error) {
         alert("Erro: " + error.message)
@@ -388,13 +425,17 @@ export default function App() {
   }
 
   const saveEditCredor = async (id) => {
+    const dadosAtualizados = {
+      ...editCredorData,
+      foto_url: formatarUrlFoto(editCredorData.foto_url),
+    }
     if (supabase)
       await supabase
         .from("credores_cadastrados")
-        .update(editCredorData)
+        .update(dadosAtualizados)
         .eq("id", id)
     setCredores(
-      credores.map((c) => (c.id === id ? { ...c, ...editCredorData } : c)),
+      credores.map((c) => (c.id === id ? { ...c, ...dadosAtualizados } : c)),
     )
     setEditingCredorId(null)
   }
@@ -538,7 +579,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent text-center">
-              Gestão Financeira V PRO
+              Gestão Financeira V
             </h1>
             <p className="text-sm text-slate-400 mt-2 text-center">
               {isRegistering
@@ -681,7 +722,7 @@ export default function App() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-              Gestão Financeira V PRO
+              Gestão Financeira V
             </h1>
             <p className="text-sm text-slate-400 mt-1">
               Logado como:{" "}
@@ -834,7 +875,7 @@ export default function App() {
                         <div className="flex items-center gap-3">
                           {cliObj?.foto_url ? (
                             <img
-                              src={cliObj.foto_url}
+                              src={formatarUrlFoto(cliObj.foto_url)}
                               alt=""
                               className="w-10 h-10 rounded-full object-cover border border-slate-700"
                             />
@@ -962,7 +1003,7 @@ export default function App() {
                           <td className="p-4 font-semibold text-slate-200 flex items-center gap-3">
                             {cliObj?.foto_url ? (
                               <img
-                                src={cliObj.foto_url}
+                                src={formatarUrlFoto(cliObj.foto_url)}
                                 alt=""
                                 className="w-8 h-8 rounded-full object-cover border border-slate-700"
                               />
@@ -1107,7 +1148,7 @@ export default function App() {
                           {isEditing ? (
                             <input
                               type="text"
-                              placeholder="URL da Foto"
+                              placeholder="URL ou ID Drive"
                               value={editClienteData.foto_url}
                               onChange={(e) =>
                                 setEditClienteData({
@@ -1115,11 +1156,11 @@ export default function App() {
                                   foto_url: e.target.value,
                                 })
                               }
-                              className="bg-slate-800 text-xs p-1 rounded text-white w-24"
+                              className="bg-slate-800 text-xs p-1 rounded text-white w-28"
                             />
                           ) : cli.foto_url ? (
                             <img
-                              src={cli.foto_url}
+                              src={formatarUrlFoto(cli.foto_url)}
                               alt=""
                               className="w-9 h-9 rounded-full object-cover border border-slate-700"
                             />
@@ -1270,7 +1311,7 @@ export default function App() {
                           {isEditing ? (
                             <input
                               type="text"
-                              placeholder="URL da Foto"
+                              placeholder="URL ou ID Drive"
                               value={editCredorData.foto_url}
                               onChange={(e) =>
                                 setEditCredorData({
@@ -1278,11 +1319,11 @@ export default function App() {
                                   foto_url: e.target.value,
                                 })
                               }
-                              className="bg-slate-800 text-xs p-1 rounded text-white w-24"
+                              className="bg-slate-800 text-xs p-1 rounded text-white w-28"
                             />
                           ) : cred.foto_url ? (
                             <img
-                              src={cred.foto_url}
+                              src={formatarUrlFoto(cred.foto_url)}
                               alt=""
                               className="w-9 h-9 rounded-full object-cover border border-slate-700"
                             />
@@ -1443,7 +1484,7 @@ export default function App() {
                         <td className="p-4 font-semibold text-slate-200 flex items-center gap-3">
                           {credObj?.foto_url ? (
                             <img
-                              src={credObj.foto_url}
+                              src={formatarUrlFoto(credObj.foto_url)}
                               alt=""
                               className="w-8 h-8 rounded-full object-cover border border-slate-700"
                             />
@@ -1527,11 +1568,11 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">
-                  Link da Foto (Opcional)
+                  Link ou ID da Foto do Drive (Opcional)
                 </label>
                 <input
                   type="text"
-                  placeholder="https://..."
+                  placeholder="Cole o link ou ID..."
                   value={newCliente.foto_url}
                   onChange={(e) =>
                     setNewCliente({ ...newCliente, foto_url: e.target.value })
@@ -1647,11 +1688,11 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">
-                  Link da Logo / Foto (Opcional)
+                  Link ou ID da Logo do Drive (Opcional)
                 </label>
                 <input
                   type="text"
-                  placeholder="https://..."
+                  placeholder="Cole o link ou ID..."
                   value={newCredor.foto_url}
                   onChange={(e) =>
                     setNewCredor({ ...newCredor, foto_url: e.target.value })
